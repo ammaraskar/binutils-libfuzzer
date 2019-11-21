@@ -20,3 +20,9 @@ and create a container with the fuzzing binaries.
    
 3. Compile the tool with `CFLAGS="-fsanitize=fuzzer"`.
    For example: `make nm-new CFLAGS="-fsanitize=fuzzer"`
+
+## Current Fuzzers
+
+* [`nm -C`](./nm-fuzzer.patch)
+
+* [`readelf -a`](./readelf-fuzzer.patch)
