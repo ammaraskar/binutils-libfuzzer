@@ -1,0 +1,47 @@
+--- readelf-old.c       2019-11-21 09:54:54.765393085 +0000
++++ readelf.c   2019-11-21 10:12:24.628626641 +0000
+@@ -19112,7 +19112,7 @@
+ #endif
+
+ int
+-main (int argc, char ** argv)
++_main (int argc, char ** argv)
+ {
+   int err;
+
+@@ -19148,3 +19148,35 @@
+
+   return err ? EXIT_FAILURE : EXIT_SUCCESS;
+ }
++
++static int initialized = 0;
++
++int LLVMFuzzerTestOneInput(const char* data, size_t size) {
++    if (!initialized) {
++        do_syms = TRUE;
++        do_reloc = TRUE;
++        do_unwind = TRUE;
++        do_dynamic = TRUE;
++        do_header = TRUE;
++        do_sections = TRUE;
++        do_section_groups = TRUE;
++        do_segments = TRUE;
++        do_version = TRUE;
++        do_histogram = TRUE;
++        do_arch = TRUE;
++        do_notes = TRUE;
++
++        initialized = 1;
++    }
++    FILE* fake_file = fmemopen((void*) data, size, "rb");
++
++    Filedata filedata = { 0 };
++    filedata.file_name = "./fake_file";
++    filedata.handle = fake_file;
++    filedata.file_size = (bfd_size_type) size;
++
++    process_archive(&filedata, FALSE);
++
++    fclose(fake_file);
++    return 0;
++}

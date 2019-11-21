@@ -28,6 +28,11 @@ RUN make -j$(nproc) CFLAGS="-fsanitize=fuzzer-no-link"
 
 # Change into the binutils dir and create our fuzzers.
 WORKDIR binutils
+
 ADD nm-fuzzer.patch .
 RUN patch nm.c -i nm-fuzzer.patch
 RUN make nm-new CFLAGS="-fsanitize=fuzzer"
+
+ADD readelf-fuzzer.patch .
+RUN patch readelf.c -i readelf-fuzzer.patch
+RUN make readelf CFLAGS="-fsanitize=fuzzer"
