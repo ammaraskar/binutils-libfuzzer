@@ -1,0 +1,110 @@
+--- nm-old.c    2019-11-21 09:32:20.610996013 +0000
++++ nm.c        2019-11-21 09:39:29.844180873 +0000
+@@ -38,6 +38,16 @@
+ #include "bucomm.h"
+ #include "plugin-api.h"
+ #include "plugin.h"
++#include <sys/mman.h>
++#include <setjmp.h>
++
++jmp_buf fatal_jmp;
++
++#define bfd_fatal(msg) \
++  do { \
++    bfd_nonfatal(msg); \
++    longjmp(fatal_jmp, 1); \
++  } while (0);
+
+ /* When sorting by size, we use this structure to hold the size and a
+    pointer to the minisymbol.  */
+@@ -1293,23 +1303,29 @@
+     }
+ }
+
++static bfd_boolean display_bfd_file(bfd*, char*);
++
+ static bfd_boolean
+-display_file (char *filename)
++display_file(char *filename)
+ {
+-  bfd_boolean retval = TRUE;
+-  bfd *file;
+-  char **matching;
+-
+   if (get_file_size (filename) < 1)
+     return FALSE;
+
+-  file = bfd_openr (filename, target ? target : plugin_target);
++  bfd *file = bfd_openr (filename, target ? target : plugin_target);
+   if (file == NULL)
+     {
+       bfd_nonfatal (filename);
+       return FALSE;
+     }
+
++  return display_bfd_file(file, filename);
++}
++static bfd_boolean
++display_bfd_file (bfd *file, char *filename)
++{
++  bfd_boolean retval = TRUE;
++  char **matching;
++
+   /* If printing line numbers, decompress the debug sections.  */
+   if (line_numbers)
+     file->flags |= BFD_DECOMPRESS;
+@@ -1628,7 +1644,7 @@
+ }
+
+ int
+-main (int argc, char **argv)
++_main (int argc, char **argv)
+ {
+   int c;
+   int retval;
+@@ -1805,3 +1821,44 @@
+   exit (retval);
+   return retval;
+ }
++
++char* FAKE_NAME = "./fake_fuzz_file";
++static int initialized = 0;
++
++int LLVMFuzzerTestOneInput(const char* data, size_t size) {
++    if (!initialized) {
++        bfd_init();
++        set_default_bfd_target();
++        do_demangle = 1;
++
++        initialized = 1;
++    }
++
++    // simulate `nm -a @@`
++    int fd = memfd_create(FAKE_NAME, 0);
++    write(fd, data, size);
++    lseek(fd, 0, SEEK_SET);
++
++    bfd* file = bfd_fdopenr(FAKE_NAME, plugin_target, fd);
++
++    if (file == NULL) {
++        close(fd);
++        return 0;
++    }
++
++    int r = setjmp(fatal_jmp);
++    // we longjmp with a non-zero code for fatal
++    // errors instead of killing the program.
++    if (r == 0) {
++        display_bfd_file(file, FAKE_NAME);
++    } else {
++        printf("longjmp from fatal error\n");
++    }
++
++    lineno_cache_bfd = NULL;
++    lineno_cache_rel_bfd = NULL;
++
++    close(fd);
++    return 0;
++}
++
+
